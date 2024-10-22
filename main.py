@@ -1,97 +1,74 @@
-import os
 import threading
 import time
-from distutils.command.clean import clean
 
-flag = []  # Banderas de hilos
-turn = 0  # Indica quién entra en la sección crítica
-lock = threading.Lock()  # Bloquea la sección crítica cuando está en uso
+mensaje = []
 
+class DekkerLock:
+    def __init__(self):
+        # Flags para indicar si un proceso quiere entrar a la sección crítica
+        self.flag = [False, False]
+        # Variable para indicar de quién es el turno
+        self.turn = 0
 
-class Proceso(threading.Thread):
-    def __init__(self, id, Cant_procesos, tiempo):
-        threading.Thread.__init__(self)
-        self.id = id  # ID del hilo (0 o 1)
-        self.Cant_procesos = Cant_procesos
+    def lock(self, process_id):
+        other = 1 - process_id  # ID del otro proceso
 
-    def run(self):
-        global flag, turn
-        for i in range(self.Cant_procesos):
-            flag[self.id] = True  # Hilo 'id' quiere entrar
+        # Indica que este proceso quiere entrar
+        self.flag[process_id] = True
 
-            # Algoritmo de Dekker para esperar si no es el turno de este hilo
-            while flag[1 - self.id]:
-                with lock:
-                    if turn != self.id:  # Si no es mi turno
-                        flag[self.id] = False  # Cedo el turno
-                        while turn != self.id:  # Espera activa
-                            pass
-                        flag[self.id] = True  # Retomo mi intención de entrar
+        # Mientras el otro proceso también quiera entrar
+        while self.flag[other]:
+            # Si no es nuestro turno
+            if self.turn != process_id:
+                # Bajamos nuestra bandera y esperamos nuestro turno
+                self.flag[process_id] = False
+                while self.turn != process_id:
+                    time.sleep(0.1)  # Espera activa
+                # Volvemos a levantar nuestra bandera
+                self.flag[process_id] = True
 
-            # Sección crítica
-            self.criticalSection(tiempo)
-
-            # Sección de salida
-            with lock:
-                turn = 1 - self.id  # Cedo el turno al otro hilo
-            flag[self.id] = False  # Salgo de la sección crítica
-
-            # Sección no crítica
-            self.nonCriticalSection(tiempo)
-
-    def criticalSection(self, tiempo):
-        # Simulación de una operación crítica
-        print(f"{threading.current_thread().name} está en la sección crítica.")
-        time.sleep(tiempo)  # Simula el tiempo de alguna tarea en la sección crítica
-
-    def nonCriticalSection(self, tiempo):
-        # Simulación de una operación no crítica
-        print(f"{threading.current_thread().name} está en la sección NO crítica.")
-        time.sleep(tiempo)  # Tiempo que tarda en la sección no crítica
+    def unlock(self, process_id):
+        # Cambiamos el turno al otro proceso
+        self.turn = 1 - process_id
+        # Bajamos nuestra bandera
+        self.flag[process_id] = False
 
 
-def ejecutarProcesos(Idproceso, cantProceso, tiempos):
-    for i in range(len(Idproceso)):
-        t = Proceso(Idproceso[i], cantProceso[i], tiempos[i])  # Crea el nuemero de hilos
-        t.start()  # Inicia el proceso
-        t.join()  # Espera que termine el proceso
-
-
-
-
-
-if __name__ == "__main__":
-    # Se solicitan los datos de los procesos y el hilo que se ejecuta
-    procesos_agregados = []
-    cant_prosess_ejecut = []
-    tiempos = []
-
-    while True:
+# Ejemplo de uso
+def proceso_critico(lock, process_id, iterations, tiempo_ejecucion,tiempo_espera):
+    for i in range(iterations):
+        lock.lock(process_id)
         try:
-            # Solicita el ID del proceso
-            num = int(input("Ingrese el número de ID del proceso: "))
+            # Sección crítica
+            print(f"Proceso {process_id} en sección crítica - iteración {i+1}")
+            mensaje.append(f"Proceso {process_id} en sección crítica - iteración {i+1}")
+            time.sleep(tiempo_ejecucion)  # Simulamos trabajo
+        finally:
+            lock.unlock(process_id)
 
-            # Verifica si el ID del proceso ya está agregado a la lista
-            if num in procesos_agregados:
-                raise ValueError("El ID del proceso ya está agregado.")
-            else:
-                procesos_agregados.append(num)
-                flag.append(False)
+        # Sección no crítica
+        time.sleep(tiempo_espera)  # Simulamos otro trabajo
 
-            # Solicita la cantidad de procesos para ese ID
-            pros = int(input("Ingrese la cantidad de procesos a ejecutar: "))
-            cant_prosess_ejecut.append(pros)  # agrega a una lista los procesos a ejecutar
 
-            # Solicita el tiempo que desea que se tarde el proceso
-            tiempo = float(input("Ingrese el tiempo que dese que tarde el proceso en segundos: "))
-            tiempos.append(tiempo)
 
-            pregunta = int(input("Si desea agregar otro proceso ingres '1' si no precione cualquier tecla: "))
 
-            if pregunta != 1:
-                ejecutarProcesos(procesos_agregados, cant_prosess_ejecut, tiempos)
-                break  # Sale del ciclo cuando los procesos terminan correctamente
+#Solicitamos datos para ver los procesos que quiere ejecutar
+dkk1 = int(input("Ingrese la cantidad de procesoso a ejectar en el hilo 0: "))
+dkk2 = int(input("Ingrese la cantidad de procesoso a ejectar en el hilo 1: "))
 
-        except ValueError as ve:
-            print(ve)
-            print("Por favor, ingrese un nuevo ID que no esté agregado.")
+tmp_ejecucion = float(input("Ingrese el tiempo en segundos que quiere que dure la ejecucion del trabajo: "))
+tmp_espera = float(input("Ingrese el tiempo en segundos que quiere que dure la espera del siguiente trabajo: "))
+
+# Crear instancia del candado de Dekker
+dekker_lock = DekkerLock()
+
+# Crear y ejecutar dos hilos
+t1 = threading.Thread(target=proceso_critico, args=(dekker_lock, 0, dkk1,tmp_ejecucion,tmp_espera))
+t2 = threading.Thread(target=proceso_critico, args=(dekker_lock, 1, dkk2,tmp_ejecucion,tmp_espera))
+
+t1.start()
+t2.start()
+
+t1.join()
+t2.join()
+

@@ -78,7 +78,7 @@ class Mesa:
             self.filosofos.append(filosofo)
             filosofo.start()
 
-if __name__ == '__main__':
+def inicio():
     root = tk.Tk()
     root.title('Filosofos Comensales')
     mesa = Mesa(root)

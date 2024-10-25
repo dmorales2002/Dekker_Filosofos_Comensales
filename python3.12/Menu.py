@@ -1,5 +1,5 @@
 import Dekker
-import Dekker_Filosofos_Comensales
+import Filosofos_Comensales
 
 # menu_principal.py
 def mostrar_menu():

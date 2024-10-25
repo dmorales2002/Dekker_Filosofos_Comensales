@@ -1,79 +1,86 @@
 import threading
 import time
-import random
+import tkinter as tk
 
+class Filosofo(threading.Thread):
+    def __init__(self, mesa, id, left_palillo, right_palillo):
+        threading.Thread.__init__(self)
+        self.mesa = mesa
+        self.id = id
+        self.left_palillo = left_palillo
+        self.right_palillo = right_palillo
+        self.estado = 'Pensando'
 
-class FilosofosComensal:
-    def __init__(self, num_filosofos=5):
-        self.num_filosofos = num_filosofos
-        self.tenedores = [threading.Lock() for _ in range(num_filosofos)]
-        self.estado_filosofos = ['PENSANDO'] * num_filosofos
-        self.estado_lock = threading.Lock()
-
-    def obtener_tenedores(self, filosofo):
-        tenedor_izq = filosofo
-        tenedor_der = (filosofo + 1) % self.num_filosofos
-
-        # Intenta tomar ambos tenedores o ninguno para evitar deadlock
-        with self.estado_lock:
-            while self.estado_filosofos[filosofo] != 'COMIENDO':
-                if (self.estado_filosofos[(filosofo - 1) % self.num_filosofos] != 'COMIENDO' and
-                        self.estado_filosofos[(filosofo + 1) % self.num_filosofos] != 'COMIENDO'):
-
-                    if self.tenedores[tenedor_izq].acquire(blocking=False):
-                        if self.tenedores[tenedor_der].acquire(blocking=False):
-                            self.estado_filosofos[filosofo] = 'COMIENDO'
-                            break
-                        else:
-                            self.tenedores[tenedor_izq].release()
-                time.sleep(0.1)
-
-    def liberar_tenedores(self, filosofo):
-        tenedor_izq = filosofo
-        tenedor_der = (filosofo + 1) % self.num_filosofos
-
-        with self.estado_lock:
-            self.estado_filosofos[filosofo] = 'PENSANDO'
-            self.tenedores[tenedor_izq].release()
-            self.tenedores[tenedor_der].release()
-
-    def filosofo(self, id_filosofo):
+    def run(self):
         while True:
-            # Pensando
-            tiempo_pensando = random.uniform(1, 3)
-            print(f"Filósofo {id_filosofo} está pensando por {tiempo_pensando:.1f} segundos")
-            time.sleep(tiempo_pensando)
+            self.pensar()
+            self.comer()
 
-            # Hambriento
-            print(f"Filósofo {id_filosofo} tiene hambre y quiere comer")
-            self.obtener_tenedores(id_filosofo)
+    def pensar(self):
+        self.estado = 'Pensando'
+        self.mesa.actualizar_estado(self.id, self.estado)
+        time.sleep(2)
 
-            # Comiendo
-            tiempo_comiendo = random.uniform(1, 3)
-            print(f"Filósofo {id_filosofo} está comiendo por {tiempo_comiendo:.1f} segundos")
-            time.sleep(tiempo_comiendo)
+    def comer(self):
+        self.estado = 'Hambriento'
+        self.mesa.actualizar_estado(self.id, self.estado)
+        with self.left_palillo.lock:
+            with self.right_palillo.lock:
+                self.estado = 'Comiendo'
+                self.mesa.actualizar_estado(self.id, self.estado)
+                time.sleep(2)
 
-            # Terminó de comer
-            self.liberar_tenedores(id_filosofo)
-            print(f"Filósofo {id_filosofo} terminó de comer y vuelve a pensar")
+class Palillo:
+    def __init__(self):
+        self.lock = threading.Lock()
 
-    def iniciar_simulacion(self):
-        filosofos = []
-        for i in range(self.num_filosofos):
-            filosofo = threading.Thread(target=self.filosofo, args=(i,))
-            filosofo.daemon = True
-            filosofos.append(filosofo)
+class Mesa:
+    def __init__(self, root):
+        self.root = root
+        self.filosofos = []
+        self.palillos = [Palillo() for _ in range(5)]
+        self.estados = [tk.StringVar() for _ in range(5)]
+        self.crear_interfaz()
 
-        for f in filosofos:
-            f.start()
+    def crear_interfaz(self):
+        self.canvas = tk.Canvas(self.root, width=400, height=400)
+        self.canvas.pack()
 
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\nFinalizando simulación...")
+        self.posiciones_filosofos = [
+            (200, 50), (350, 150), (300, 300), (100, 300), (50, 150)
+        ]
+        self.circulos_filosofos = []
+        self.textos_filosofos = []
 
+        for i, pos in enumerate(self.posiciones_filosofos):
+            x, y = pos
+            circulo = self.canvas.create_oval(x-20, y-20, x+20, y+20, fill='white')
+            texto = self.canvas.create_text(x, y, text=f'Filósofo {i+1}\nPensando', fill='black')
+            self.circulos_filosofos.append(circulo)
+            self.textos_filosofos.append(texto)
 
-if __name__ == "__main__":
-    simulacion = FilosofosComensal(5)
-    simulacion.iniciar_simulacion()
+    def actualizar_estado(self, id, estado):
+        color = 'white'
+        if estado == 'Pensando':
+            color = 'white'
+        elif estado == 'Hambriento':
+            color = 'yellow'
+        elif estado == 'Comiendo':
+            color = 'green'
+
+        self.canvas.itemconfig(self.circulos_filosofos[id], fill=color)
+        self.canvas.itemconfig(self.textos_filosofos[id], text=f'Filósofo {id+1}\n{estado}', fill='black')
+        self.root.update_idletasks()
+
+    def iniciar(self):
+        for i in range(5):
+            filosofo = Filosofo(self, i, self.palillos[i], self.palillos[(i+1) % 5])
+            self.filosofos.append(filosofo)
+            filosofo.start()
+
+if __name__ == '__main__':
+    root = tk.Tk()
+    root.title('Filosofos Comensales')
+    mesa = Mesa(root)
+    mesa.iniciar()
+    root.mainloop()

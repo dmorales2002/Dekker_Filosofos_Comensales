@@ -3,6 +3,7 @@ import time
 
 mensaje = []
 
+
 class DekkerLock:
     def __init__(self):
         # Flags para indicar si un proceso quiere entrar a la sección crítica
@@ -35,13 +36,13 @@ class DekkerLock:
 
 
 # Ejemplo de uso
-def proceso_critico(lock, process_id, iterations, tiempo_ejecucion,tiempo_espera):
+def proceso_critico(lock, process_id, iterations, tiempo_ejecucion, tiempo_espera):
     for i in range(iterations):
         lock.lock(process_id)
         try:
             # Sección crítica
-            print(f"Proceso {process_id} en sección crítica - iteración {i+1}")
-            mensaje.append(f"Proceso {process_id} en sección crítica - iteración {i+1}")
+            print(f"Proceso {process_id} en sección crítica - iteración {i + 1}")
+            mensaje.append(f"Proceso {process_id} en sección crítica - iteración {i + 1}")
             time.sleep(tiempo_ejecucion)  # Simulamos trabajo
         finally:
             lock.unlock(process_id)
@@ -50,25 +51,23 @@ def proceso_critico(lock, process_id, iterations, tiempo_ejecucion,tiempo_espera
         time.sleep(tiempo_espera)  # Simulamos otro trabajo
 
 
+def inicio():
+    # Solicitamos datos para ver los procesos que quiere ejecutar
+    dkk1 = int(input("Ingrese la cantidad de procesoso a ejectar en el hilo 0: "))
+    dkk2 = int(input("Ingrese la cantidad de procesoso a ejectar en el hilo 1: "))
 
+    tmp_ejecucion = float(input("Ingrese el tiempo en segundos que quiere que dure la ejecucion del trabajo: "))
+    tmp_espera = float(input("Ingrese el tiempo en segundos que quiere que dure la espera del siguiente trabajo: "))
 
-#Solicitamos datos para ver los procesos que quiere ejecutar
-dkk1 = int(input("Ingrese la cantidad de procesoso a ejectar en el hilo 0: "))
-dkk2 = int(input("Ingrese la cantidad de procesoso a ejectar en el hilo 1: "))
+    # Crear instancia del candado de Dekker
+    dekker_lock = DekkerLock()
 
-tmp_ejecucion = float(input("Ingrese el tiempo en segundos que quiere que dure la ejecucion del trabajo: "))
-tmp_espera = float(input("Ingrese el tiempo en segundos que quiere que dure la espera del siguiente trabajo: "))
+    # Crear y ejecutar dos hilos
+    t1 = threading.Thread(target=proceso_critico, args=(dekker_lock, 0, dkk1, tmp_ejecucion, tmp_espera))
+    t2 = threading.Thread(target=proceso_critico, args=(dekker_lock, 1, dkk2, tmp_ejecucion, tmp_espera))
 
-# Crear instancia del candado de Dekker
-dekker_lock = DekkerLock()
+    t1.start()
+    t2.start()
 
-# Crear y ejecutar dos hilos
-t1 = threading.Thread(target=proceso_critico, args=(dekker_lock, 0, dkk1,tmp_ejecucion,tmp_espera))
-t2 = threading.Thread(target=proceso_critico, args=(dekker_lock, 1, dkk2,tmp_ejecucion,tmp_espera))
-
-t1.start()
-t2.start()
-
-t1.join()
-t2.join()
-
+    t1.join()
+    t2.join()
